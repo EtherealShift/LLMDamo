@@ -11,7 +11,7 @@ import java.net.http.HttpResponse;
 
 public class HttpClientCaller {
 
-    private static final String API_KEY = "sk-ea2194eb2be34b18b41b91f37ff9c22e";
+    private static final String API_KEY = "sk-16d7eec8629147dcb9e15300f2fd519d";
     private static final String API_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
 
     public static void main(String[] args) throws IOException, InterruptedException {
