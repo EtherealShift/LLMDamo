@@ -1,9 +1,11 @@
 package com.example.llmdamo.controller;
 
+import jakarta.annotation.Resource;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,12 +16,21 @@ import java.util.Map;
 @RestController
 public class DSChatController {
 
+    @Resource
+    private  DeepSeekChatModel chatModel;
 
-    private final DeepSeekChatModel chatModel;
+    @Resource
+    private ChatClient chatClient;
 
-    @Autowired
-    public DSChatController(DeepSeekChatModel chatModel) {
-        this.chatModel = chatModel;
+    @GetMapping(value = "/ai/generateDS", produces = "text/html; charset=UTF-8")
+    public String generateDS(@RequestParam(value = "message", defaultValue = "给我讲一个笑话") String message) {
+        return chatClient.prompt("你是一个助手").user(message).call().content();
+    }
+
+    @GetMapping(value = "/ai/generateDSStream", produces = "text/html; charset=UTF-8")
+    public Flux<String> generateDSStream(@RequestParam(value = "message", defaultValue = "讲一个笑话给我") String message) {
+
+        return chatClient.prompt("你是一个助手").user(message).stream().content();
     }
 
     @GetMapping("/ai/generate")
@@ -34,13 +45,5 @@ public class DSChatController {
         return chatModel.stream(prompt).mapNotNull(ChatResponse -> ChatResponse.getResult().getOutput().getText());
     }
 
-//    @GetMapping(value = "/ai/generatePythonCode", produces = "text/html; charset=UTF-8")
-//    public String generateCode(@RequestParam(value = "message", defaultValue = "请写快速排序代码") String message) {
-//        UserMessage userMessage = new UserMessage(message);
-//        Message assistantMessage = DeepSeekAssistantMessage.prefixAssistantMessage("```python\\n");
-//        Prompt prompt = new Prompt(List.of(userMessage, assistantMessage), ChatOptions.builder().stopSequences(List.of("```")).build());
-//        ChatResponse response = chatModel.call(prompt);
-//        return response.getResult().getOutput().getText();
-//    }
 
 }
