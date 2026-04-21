@@ -1,7 +1,12 @@
 package com.example.llmdamo.controller;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.example.llmdamo.entity.History;
+import com.example.llmdamo.service.HistoryService;
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
@@ -11,7 +16,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 public class DSChatController {
@@ -21,6 +29,9 @@ public class DSChatController {
 
     @Resource
     private ChatClient chatClient;
+
+    @Resource
+    private HistoryService historyService;
 
     @GetMapping(value = "/ai/generateDS", produces = "text/html; charset=UTF-8")
     public String generateDS(@RequestParam(value = "message", defaultValue = "给我讲一个笑话") String message) {
@@ -46,4 +57,57 @@ public class DSChatController {
     }
 
 
+    @GetMapping(value = "/ai/generateStreamMySQL", produces = "text/html; charset=UTF-8")
+    public Flux<String> generateStreamMySQL(@RequestParam(value = "message", defaultValue = "讲一个笑话给我") String message,
+                                            @RequestParam(value = "sessionId", defaultValue = "1") Long sessionId) {
+        // 保存用户聊天记录
+        History userHistory = new History();
+        userHistory.setSessionId(sessionId);
+        userHistory.setContent(message);
+        userHistory.setRole("user");
+        userHistory.setDataTime(LocalDateTime.now());
+        historyService.save(userHistory);
+
+        // 获取sessionId对应的历史记录
+        List<History> historyList = historyService.list(new LambdaUpdateWrapper<History>().eq(History::getSessionId, sessionId).ne(History::getId, userHistory.getId()));
+
+        List<Message> messages = historyList.stream().map(history -> "user".equals(history.getRole())
+                ? new UserMessage(history.getContent()) : new AssistantMessage(history.getContent())).collect(Collectors.toList());
+
+        StringBuilder[] sb = {new StringBuilder()};
+
+        Flux<String> stream = chatClient.prompt("你是一个助手").user(message).messages(messages).stream().content();
+        return stream.doOnNext(s -> sb[0].append(s)).doOnComplete(() -> {
+            History assistantHistory = new History();
+            assistantHistory.setSessionId(sessionId);
+            assistantHistory.setContent(sb[0].toString());
+            assistantHistory.setRole("assistant");
+            assistantHistory.setDataTime(LocalDateTime.now());
+
+            historyService.save(assistantHistory);
+        });
+    }
+
+
+
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
